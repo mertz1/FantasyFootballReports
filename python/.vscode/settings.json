@@ -1,0 +1,5 @@
+{
+    "python.analysis.extraPaths": [
+        "./pro-football-reference-web-scraper-main/pro_football_reference_web_scraper"
+    ]
+}

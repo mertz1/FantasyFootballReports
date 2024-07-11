@@ -1,0 +1,6 @@
+*.vscode/*
+*.conda/*
+*.csv
+Utilities/*
+footballdb*data/
+
