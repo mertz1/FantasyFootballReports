@@ -16,6 +16,12 @@ def update_sql_isloaded(cursor, name):
 
     cursor.execute(statement)
 
+
+def update_player_url(cursor, name, url):
+    statement = 'UPDATE footballdb_players SET url = \'' + url + '\' WHERE \"Name\" = \'' + re.sub("'", "''", name) + '\''
+
+    cursor.execute(statement)
+
 #game_log = pgl.get_player_game_log(player = 'Josh Allen', position = 'QB', season = 2022)
 #print(game_log)
 
@@ -27,7 +33,7 @@ def update_sql_isloaded(cursor, name):
 
 #game_log = pgl.get_player_game_log(player = 'Justin Fields', position = 'QB', season = 2022)
 
-season = 2023
+season = 2021
 position = 'RB'
 
 ###
@@ -46,10 +52,11 @@ conn = psycopg2.connect(database="fantasyfootball",
 cursor = conn.cursor()
 
 cursor.execute("SELECT fdp.* FROM footballdb_players fdp " +
-               " join rb_weekly rw on rw.name = fdp.\"Name\" and fdp.\"Position\" = '" + position + "'"
+              # " join rb_weekly rw on rw.name = fdp.\"Name\" and fdp.\"Position\" = '" + position + "'"
                " join profootball_rb_loaded fdpl on fdpl.name = fdp.\"profootball_name\""
-               " where rw.year = " + str(season) + 
-               " and fdpl.\"year\" = " + str(season) + " and (isloaded = false or isloaded is null) "
+              # " where rw.year = " + str(season) + 
+               " and fdpl.\"year\" = " + str(season) + " and (isloaded = false or isloaded is null)  and ignoreupload = false"
+               " and fdp.\"Position\" = '" + position + "'"
                " group by fdp.\"Id\", fdp.\"Name\" having count(*) > 0;")
 
 #print(cursor.fetchone())
@@ -60,6 +67,7 @@ all_players = cursor.fetchall()
 for player in all_players:
     try:
         player_name = player[4]
+        player_url = player[6]
         sys.stdout.write('loading ' + player_name + '\n')
 
 
@@ -84,7 +92,11 @@ for player in all_players:
         '''
         # END COMMENT IF DOING CURRENT SEASON
 
-        game_log = pgl(player = player_name, position = 'RB', season = season)
+        game_log, url = pgl(player = player_name, position = 'RB', season = season, player_url=player_url)
+
+        if url:
+            update_player_url(cursor, player_name, url)
+
         game_log['name'] = player_name
         game_log['year'] = season
         game_log.set_index(['name', 'date'])
@@ -123,7 +135,6 @@ for player in all_players:
 #        qb_is_loaded['isloaded'] = True
         update_sql_isloaded(cursor, player_name)
         conn.commit()
-        time.sleep(2)
 
     except Exception as e:
         print(e)

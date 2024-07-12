@@ -326,8 +326,7 @@ def wr_game_log(soup: BeautifulSoup, season: int) -> pd.DataFrame:
             
             elements = table_rows[i].find_all('td')
             x = elements[len(elements) - 1].text
-            if x == 'Inactive'or x == 'Did Not Play' or x == 'Injured Reserve':
-                data['inactive'].append(True)
+            data['inactive'].append(True)
 
 
         if i not in to_ignore:
@@ -420,7 +419,7 @@ def rb_game_log(soup: BeautifulSoup) -> pd.DataFrame:
         'fumbles': [],
         'snaps': [],
         'snap_pct': [],
-
+        'inactive': []
     }  # type: dict
 
     table_rows = soup.find('tbody').find_all('tr')
@@ -435,6 +434,42 @@ def rb_game_log(soup: BeautifulSoup) -> pd.DataFrame:
 
     # adding data to data dictionary
     for i in range(len(table_rows)):
+        if i in to_ignore:
+            data['date'].append(table_rows[i].find('td', {'data-stat': 'game_date'}).text)
+            data['week'].append(int(table_rows[i].find('td', {'data-stat': 'week_num'}).text))
+            data['age'].append(float(table_rows[i].find('td', {'data-stat': 'age'}).text or 0))
+            data['team'].append(table_rows[i].find('td', {'data-stat': 'team'}).text)
+            data['game_location'].append(table_rows[i].find('td', {'data-stat': 'game_location'}).text)
+            data['opp'].append(table_rows[i].find('td', {'data-stat': 'opp'}).text)
+            data['result'].append(table_rows[i].find('td', {'data-stat': 'game_result'}).text.split(' ')[0])
+            data['team_pts'].append(
+                int(table_rows[i].find('td', {'data-stat': 'game_result'}).text.split(' ')[1].split('-')[0])
+            )
+            data['opp_pts'].append(
+                int(table_rows[i].find('td', {'data-stat': 'game_result'}).text.split(' ')[1].split('-')[1])
+            )
+            data['started'].append(False)
+
+            data['rush_att'].append(None)
+            data['rush_yds'].append(None)
+            data['yds_per_att'].append(None)
+            data['rush_td'].append(None)
+
+            data['tgt'].append(None)
+            data['rec'].append(None)
+            data['rec_yds'].append(None)
+            data['rec_td'].append(None)
+            data['yds_per_rec'].append(None)
+            data['ctch_perc'].append(None)
+            data['yds_per_tgt'].append(None)
+            data['fumbles'].append(None)
+            data['snaps'].append(None)
+            data['snap_pct'].append(None)
+            
+            elements = table_rows[i].find_all('td')
+            x = elements[len(elements) - 1].text
+            data['inactive'].append(True)
+
         if i not in to_ignore:
             data['date'].append(table_rows[i].find('td', {'data-stat': 'game_date'}).text)
             data['week'].append(int(table_rows[i].find('td', {'data-stat': 'week_num'}).text))
@@ -493,7 +528,8 @@ def rb_game_log(soup: BeautifulSoup) -> pd.DataFrame:
 
             data['snaps'].append(int(table_rows[i].find('td', {'data-stat': 'offense'}).text or 0))
             data['snap_pct'].append(float(table_rows[i].find('td', {'data-stat': 'off_pct'}).text.replace('%', '') or 0))
-
+            data['inactive'].append(False)
+            
     return pd.DataFrame(data=data)
 
 

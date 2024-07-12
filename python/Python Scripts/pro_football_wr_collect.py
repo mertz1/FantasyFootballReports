@@ -51,10 +51,11 @@ conn = psycopg2.connect(database="fantasyfootball",
 cursor = conn.cursor()
 
 cursor.execute("SELECT fdp.* FROM footballdb_players fdp " +
-               " join wr_weekly qw on qw.name = fdp.\"Name\" and fdp.\"Position\" = '" + position + "'"
+               #" join wr_weekly qw on qw.name = fdp.\"Name\" and fdp.\"Position\" = '" + position + "'"
                " join profootball_wr_loaded fdpl on fdpl.name = fdp.\"profootball_name\""
-               " where qw.year = " + str(season) + 
-               " and fdpl.\"year\" = " + str(season) + " and (isloaded = false or isloaded is null) "
+               #" where qw.year = " + str(season) + 
+               " and fdpl.\"year\" = " + str(season) + " and (isloaded = false or isloaded is null) and ignoreupload = false"
+               " and fdp.\"Position\" = '" + position + "'"
                " group by fdp.\"Id\", fdp.\"Name\" having count(*) > 0")
 
 #print(cursor.fetchone())

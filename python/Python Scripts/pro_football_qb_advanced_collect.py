@@ -32,7 +32,7 @@ def update_player_url(cursor, name, url):
 
 #game_log = pagl.get_player_game_log(player = 'Justin Fields', position = 'QB', season = 2022)
 
-season = 2023
+season = 2021
 position = 'QB'
 
 
