@@ -70,7 +70,7 @@ for player in all_players:
 
         # if already exists:
         ### TODO!!!! IF DOING AN ACTIVE SEASON, DON'T JUST SKIP IF DATA EXISTS!
-        existing_values = pd.read_sql('select * from profootball_rb where name = \'' + re.sub("'", "''", player_name) + '\' and year = ' + str(season) + ';', con=engine)
+        existing_values = pd.read_sql('select * from profootball_rb_upload where name = \'' + re.sub("'", "''", player_name) + '\' and year = ' + str(season) + ';', con=engine)
         print(existing_values)
         
         ## Comment this out if doing current season
@@ -116,7 +116,7 @@ for player in all_players:
         #game_log = game_log.drop(duplicates, axis=0)
         #print(game_log)
 
-        dfnew.to_sql('profootball_rb', engine, if_exists='append', index=False)
+        dfnew.to_sql('profootball_rb_upload', engine, if_exists='append', index=False)
         sys.stdout.write(player_name + " loaded" + '\n')
         
         # update qb_is_loaded table

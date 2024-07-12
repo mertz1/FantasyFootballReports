@@ -27,6 +27,9 @@ def get_player_game_log(player: str, position: str, season: int, player_url: str
     if position not in valid_positions:
         raise Exception('Invalid position: "position" arg must be "QB", "RB", "WR", or "TE"')
 
+
+    new_player_url = None
+
     if not player_url:
         # make request to find proper href
         r1 = make_request_list(player, position, season)
@@ -124,7 +127,7 @@ def qb_game_log(soup: BeautifulSoup) -> pd.DataFrame:
     for i in range(len(table_rows)):
         elements = table_rows[i].find_all('td')
         x = elements[len(elements) - 1].text
-        if x == 'Inactive' or x == 'Did Not Play' or x == 'Injured Reserve':
+        if x == 'Inactive' or x == 'Did Not Play' or x == 'Injured Reserve' or 'COVID-19 List':
             to_ignore.append(i)
 
     # adding data to data dictionary
@@ -132,6 +135,7 @@ def qb_game_log(soup: BeautifulSoup) -> pd.DataFrame:
         if i in to_ignore:
             data['date'].append(table_rows[i].find('td', {'data-stat': 'game_date'}).text)
             data['week'].append(int(table_rows[i].find('td', {'data-stat': 'week_num'}).text))
+            data['age'].append(float(table_rows[i].find('td', {'data-stat': 'age'}).text or 0))
             data['team'].append(table_rows[i].find('td', {'data-stat': 'team'}).text)
             data['game_location'].append(table_rows[i].find('td', {'data-stat': 'game_location'}).text)
             data['opp'].append(table_rows[i].find('td', {'data-stat': 'opp'}).text)
@@ -142,7 +146,11 @@ def qb_game_log(soup: BeautifulSoup) -> pd.DataFrame:
             data['opp_pts'].append(
                 int(table_rows[i].find('td', {'data-stat': 'game_result'}).text.split(' ')[1].split('-')[1])
             )
+
             data['started'].append(None)
+
+            #10
+
             data['cmp'].append(None)
             data['att'].append(None)
             data['cmp_perc'].append(None)
@@ -151,6 +159,8 @@ def qb_game_log(soup: BeautifulSoup) -> pd.DataFrame:
             data['int'].append(None)
             data['rating'].append(None)
             data['sacked'].append(None)
+
+            #18
             data['rush_att'].append(None)
             data['rush_yds'].append(None)
             data['rush_td'].append(None)
@@ -158,10 +168,7 @@ def qb_game_log(soup: BeautifulSoup) -> pd.DataFrame:
             data['snaps'].append(None)
             data['snap_pct'].append(None)
 
-            elements = table_rows[i].find_all('td')
-            x = elements[len(elements) - 1].text
-            if x == 'Inactive'or x == 'Did Not Play' or x == 'Injured Reserve':
-                data['inactive'].append(True)
+            data['inactive'].append(True)
 
 
         if i not in to_ignore:
@@ -187,7 +194,7 @@ def qb_game_log(soup: BeautifulSoup) -> pd.DataFrame:
                     started = True
                 data['started'].append(started)
 
-                temp = table_rows[i]
+                #10
 
                 if not table_rows[i].find('td', {'data-stat': 'pass_cmp'}):
                     data['cmp'].append(int(0))
@@ -208,6 +215,7 @@ def qb_game_log(soup: BeautifulSoup) -> pd.DataFrame:
                     data['rating'].append(float(table_rows[i].find('td', {'data-stat': 'pass_rating'}).text or 0))
                     data['sacked'].append(int(table_rows[i].find('td', {'data-stat': 'pass_sacked'}).text or 0))
 
+                #18
 
                 if not table_rows[i].find('td', {'data-stat': 'rush_att'}):
                     data['rush_att'].append(0)
@@ -217,11 +225,20 @@ def qb_game_log(soup: BeautifulSoup) -> pd.DataFrame:
                     data['rush_att'].append(int(table_rows[i].find('td', {'data-stat': 'rush_att'}).text or 0))
                     data['rush_yds'].append(int(table_rows[i].find('td', {'data-stat': 'rush_yds'}).text or 0))
                     data['rush_td'].append(int(table_rows[i].find('td', {'data-stat': 'rush_td'}).text or 0))
-                data['fumbles'].append(int(table_rows[i].find('td', {'data-stat': 'fumbles_lost'}).text or 0))
+
+                #21
+
+                if not table_rows[i].find('td', {'data-stat': 'fumbles_lost'}):
+                    data['fumbles'].append(0)
+                else:
+                    data['fumbles'].append(int(table_rows[i].find('td', {'data-stat': 'fumbles_lost'}).text or 0))
+
+
                 data['snaps'].append(int(table_rows[i].find('td', {'data-stat': 'offense'}).text or 0))
                 data['snap_pct'].append(float(table_rows[i].find('td', {'data-stat': 'off_pct'}).text.replace('%', '') or 0))
             
                 data['inactive'].append(False)
+                #25
             except Exception as e:
                 print(e)
 
@@ -270,7 +287,7 @@ def wr_game_log(soup: BeautifulSoup, season: int) -> pd.DataFrame:
     for i in range(len(table_rows)):
         elements = table_rows[i].find_all('td')
         x = elements[len(elements) - 1].text
-        if x == 'Inactive' or x == 'Did Not Play' or x == 'Injured Reserve':
+        if x == 'Inactive' or x == 'Did Not Play' or x == 'Injured Reserve' or 'COVID-19 List':
             to_ignore.append(i)
 
     # adding data to data dictionray
@@ -413,7 +430,7 @@ def rb_game_log(soup: BeautifulSoup) -> pd.DataFrame:
     for i in range(len(table_rows)):
         elements = table_rows[i].find_all('td')
         x = elements[len(elements) - 1].text
-        if x == 'Inactive' or x == 'Did Not Play' or x == 'Injured Reserve':
+        if x == 'Inactive' or x == 'Did Not Play' or x == 'Injured Reserve' or 'COVID-19 List':
             to_ignore.append(i)
 
     # adding data to data dictionary

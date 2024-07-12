@@ -8,7 +8,7 @@ valid_positions = ['QB', 'RB', 'WR', 'TE']
 # function that returns a player's game log in a given season
 # player: player's full name (e.g. Tom Brady)
 # position: abbreviation (QB, RB, WR, TE only)
-def get_player_advanced_game_log(player: str, position: str, season: int) -> pd.DataFrame:
+def get_player_advanced_game_log(player: str, position: str, season: int, player_url: str = None) -> pd.DataFrame:
     """A function to retrieve a player's game log in a given season.
 
     Returns a pandas DataFrame of a NFL player's game log in a given season, including position-specific statistics.
@@ -27,26 +27,34 @@ def get_player_advanced_game_log(player: str, position: str, season: int) -> pd.
     if position not in valid_positions:
         raise Exception('Invalid position: "position" arg must be "QB", "RB", "WR", or "TE"')
 
-    # make request to find proper href
-    r1 = make_request_list(player, position, season)
-    player_list = get_soup(r1)
+    new_player_url = None
 
-    # find href
-    href = get_href(player, position, season, player_list)
+    if not player_url:
+        # make request to find proper href
+        r1 = make_request_list(player, position, season)
+        player_list = get_soup(r1)
+
+        # find href
+        href = get_href(player, position, season, player_list)
+
+        # make HTTP request and extract HTML
+        new_player_url = build_gamelog_url(href)
+        player_url = new_player_url
+
 
     # make HTTP request and extract HTML
-    r2 = make_request_player(href, season)
+    r2 = make_request_player(player_url, season)
 
     # parse HTML using BeautifulSoup
     game_log = get_soup(r2)
 
     # generating the appropriate game log format according to position
     if 'QB' in position:
-        return qb_game_log(game_log)
+        return qb_game_log(game_log), new_player_url
     elif 'WR' in position or 'TE' in position:
-        return wr_game_log(game_log, season)
+        return wr_game_log(game_log, season), new_player_url
     elif 'RB' in position:
-        return rb_game_log(game_log)
+        return rb_game_log(game_log), new_player_url
 
 
 # helper function that gets the player's href
@@ -68,11 +76,12 @@ def make_request_list(player: str, position: str, season: int):
     return requests.get(url)
 
 
-# helper function that makes a HTTP request for a given player's game log
-def make_request_player(href: str, season: int):
-    url = 'https://www.pro-football-reference.com%s/gamelog/%s/advanced' % (href, season)
-    return requests.get(url)
+def build_gamelog_url(href: str):
+    return 'https://www.pro-football-reference.com%s/gamelog/' % (href)
 
+# helper function that makes a HTTP request for a given player's game log
+def make_request_player(url: str, season: int):
+    return requests.get(url + '%s/advanced' % season)
 
 # helper function that takes a requests.Response object and returns a BeautifulSoup object
 def get_soup(request):

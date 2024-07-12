@@ -52,10 +52,11 @@ conn = psycopg2.connect(database="fantasyfootball",
 cursor = conn.cursor()
 
 cursor.execute("SELECT fdp.* FROM footballdb_players fdp " +
-               " join qb_weekly qw on qw.name = fdp.\"Name\" and fdp.\"Position\" = '" + position + "'"
+               #" join qb_weekly qw on qw.name = fdp.\"Name\" and fdp.\"Position\" = '" + position + "'"
                " join profootball_qb_advanced_loaded fdpl on fdpl.name = fdp.\"profootball_name\""
-               " where qw.year = " + str(season) + 
+               #" where qw.year = " + str(season) + 
                " and fdpl.\"year\" = " + str(season) + " and (isloaded = false or isloaded is null) "
+               " and fdp.\"Position\" = '" + position + "'"
                " group by fdp.\"Id\", fdp.\"Name\" having count(*) > 0;")
 
 #print(cursor.fetchone())
@@ -78,12 +79,12 @@ for player in all_players:
         ### TODO!!!! IF DOING AN ACTIVE SEASON, DON'T JUST SKIP IF DATA EXISTS!
         
         ### Comment out if creating table:
-        ''' 
+        
         existing_values = pd.read_sql('select * from profootball_qb_advanced where name = \'' + re.sub("'", "''", player_name) + '\' and year = ' + str(season) + ';', con=engine)
         print(existing_values)
 
         existing_values.set_index(['name', 'date'])
-        '''
+        
 
         ### END Comment out if creating table
         
@@ -111,7 +112,7 @@ for player in all_players:
 
 
 
-        ''' FOR NORMAL USE
+       
         
         dfnew  = pd.merge(game_log, existing_values, how='left', indicator='Exist')
 
@@ -120,9 +121,9 @@ for player in all_players:
         print(dfnew)
 
         dfnew.to_sql('profootball_qb_advanced', engine, if_exists='append', index=False)
-        '''
+    
 
-        game_log.to_sql('profootball_qb_advanced', engine, if_exists='append', index=False)
+        #game_log.to_sql('profootball_qb_advanced', engine, if_exists='append', index=False)
 
         #mixed_data = pd.concat([game_log, existing_values], axis=0, join='left')
         #print(mixed_data)
@@ -147,7 +148,6 @@ for player in all_players:
 #        qb_is_loaded['isloaded'] = True
         update_sql_isloaded(cursor, player_name)
         conn.commit()
-        time.sleep(2)
     except Exception as e:
         print(e)
         sys.stdout.write("ERROR:" + player_name + " unable to retrieve" + '\n')
