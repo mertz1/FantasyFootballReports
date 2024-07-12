@@ -133,7 +133,7 @@ def qb_game_log(soup: BeautifulSoup) -> pd.DataFrame:
     for i in range(len(table_rows)):
         elements = table_rows[i].find_all('td')
         x = elements[len(elements) - 1].text
-        if x == 'Inactive' or x == 'Did Not Play' or x == 'Injured Reserve':
+        if x == 'Inactive' or x == 'Did Not Play' or x == 'Injured Reserve' or x == 'COVID-19 List':
             to_ignore.append(i)
 
     # adding data to data dictionary
@@ -207,7 +207,7 @@ def wr_game_log(soup: BeautifulSoup, season: int) -> pd.DataFrame:
     for i in range(len(table_rows)):
         elements = table_rows[i].find_all('td')
         x = elements[len(elements) - 1].text
-        if x == 'Inactive' or x == 'Did Not Play' or x == 'Injured Reserve':
+        if x == 'Inactive' or x == 'Did Not Play' or x == 'Injured Reserve'  or x == 'COVID-19 List':
             to_ignore.append(i)
 
     # adding data to data dictionray
@@ -263,7 +263,7 @@ def rb_game_log(soup: BeautifulSoup) -> pd.DataFrame:
     for i in range(len(table_rows)):
         elements = table_rows[i].find_all('td')
         x = elements[len(elements) - 1].text
-        if x == 'Inactive' or x == 'Did Not Play' or x == 'Injured Reserve':
+        if x == 'Inactive' or x == 'Did Not Play' or x == 'Injured Reserve' or x == 'COVID-19 List':
             to_ignore.append(i)
 
     # adding data to data dictionary
