@@ -184,6 +184,32 @@ def wr_game_log(soup: BeautifulSoup, season: int) -> pd.DataFrame:
     # Most relevant WR stats, in my opinion.
     # Could adjust if necessary (maybe figure out how to incorporate rushing stats?)
 
+    information = [
+        [ 'date', 'game_date', 'string'],
+        [ 'week', 'week_num', 'int'],
+        [ 'team', 'team', 'string' ],
+        [ 'game_location', 'game_location', 'string' ],
+        [ 'opp', 'opp', 'string' ],
+        [ 'result', 'game_result', 'string' ],
+        [ 'team_pts', 'game_result', 'int' ],
+        [ 'opp_pts', 'game_result', 'int' ],
+        [ 'tgt', 'targets', 'int' ],
+        [ 'rec', 'rec', 'int' ],
+        [ 'rec_yds', 'rec_yds', 'int' ],
+        [ 'rec_td', 'rec_td', 'int' ],
+        [ 'rec_first_down', 'rec_first_down', 'int' ],
+        [ 'air_yds', 'rec_air_yds', 'int' ],
+        [ 'air_yds_per_rec', 'air_yards_per_rec', 'float' ],
+        [ 'yac', 'rec_yac', 'int' ],
+        [ 'yac_per_rec', 'rec_yac_per_rec', 'float' ],
+        [ 'adot', 'adot', 'float' ],
+        [ 'broken_tackles', 'rec_broken_tackles', 'int' ],
+        [ 'drops', 'rec_drops', 'int' ],
+        [ 'drop_perc', 'rec_drop_pct', 'float' ],
+        [ 'rec_pass_rating', 'rec_pass_rating', 'float' ]
+    ]
+
+
     data = {
         'date': [],
         'week': [],
@@ -198,8 +224,8 @@ def wr_game_log(soup: BeautifulSoup, season: int) -> pd.DataFrame:
         'rec_yds': [],
         'rec_td': [],
         'rec_first_down': [],
-        'air_yards': [],
-        'air_yards_per_rec': [],
+        'air_yds': [],
+        'air_yds_per_rec': [],
         'yac': [],
         'yac_per_rec': [],
         'adot': [],
@@ -222,50 +248,100 @@ def wr_game_log(soup: BeautifulSoup, season: int) -> pd.DataFrame:
     # adding data to data dictionray
     for i in range(len(table_rows)):
         if i not in to_ignore:
-            data['date'].append(table_rows[i].find('td', {'data-stat': 'game_date'}).text)
-            data['week'].append(int(table_rows[i].find('td', {'data-stat': 'week_num'}).text))
-            data['team'].append(table_rows[i].find('td', {'data-stat': 'team'}).text)
-            data['game_location'].append(table_rows[i].find('td', {'data-stat': 'game_location'}).text)
-            data['opp'].append(table_rows[i].find('td', {'data-stat': 'opp'}).text)
-            data['result'].append(table_rows[i].find('td', {'data-stat': 'game_result'}).text.split(' ')[0])
-            data['team_pts'].append(
-                int(table_rows[i].find('td', {'data-stat': 'game_result'}).text.split(' ')[1].split('-')[0])
-            )
-            data['opp_pts'].append(
-                int(table_rows[i].find('td', {'data-stat': 'game_result'}).text.split(' ')[1].split('-')[1])
-            )
+            for column in information:
+                data_frame_column = column[0]
+                web_column = column[1]
+                type_ = column[2]
+
+                if not table_rows[i].find('td', {'data-stat': web_column}) or table_rows[i].find('td', {'data-stat': web_column}).text == '':
+                    if type_ == 'float' or type_ == 'int':
+                        data[data_frame_column].append(int(0))
+                    else:
+                        data[data_frame_column].append(None)
+                else:
+                    if data_frame_column == 'team_pts':
+                        data['team_pts'].append(
+                            int(table_rows[i].find('td', {'data-stat': 'game_result'}).text.split(' ')[1].split('-')[0])
+                        )
+                    elif data_frame_column == 'opp_pts':
+                        data['opp_pts'].append(
+                            int(table_rows[i].find('td', {'data-stat': 'game_result'}).text.split(' ')[1].split('-')[1])
+                        )
+                    else:
+                        if type_ == 'float':
+                            data[data_frame_column].append(float(table_rows[i].find('td', {'data-stat': web_column}).text) or 0)
+                        elif type_ == 'int':
+                            data[data_frame_column].append(int(table_rows[i].find('td', {'data-stat': web_column}).text) or 0)
+                        else:
+                            data[data_frame_column].append(table_rows[i].find('td', {'data-stat': web_column}).text)
+                
+            # data['date'].append(table_rows[i].find('td', {'data-stat': 'game_date'}).text)
+            # data['week'].append(int(table_rows[i].find('td', {'data-stat': 'week_num'}).text))
+            # data['team'].append(table_rows[i].find('td', {'data-stat': 'team'}).text)
+            # data['game_location'].append(table_rows[i].find('td', {'data-stat': 'game_location'}).text)
+            # data['opp'].append(table_rows[i].find('td', {'data-stat': 'opp'}).text)
+            # data['result'].append(table_rows[i].find('td', {'data-stat': 'game_result'}).text.split(' ')[0])
+            # data['team_pts'].append(
+            #     int(table_rows[i].find('td', {'data-stat': 'game_result'}).text.split(' ')[1].split('-')[0])
+            # )
+            # data['opp_pts'].append(
+            #     int(table_rows[i].find('td', {'data-stat': 'game_result'}).text.split(' ')[1].split('-')[1])
+            # )
             
             
-            if not table_rows[i].find('td', {'data-stat': 'tgt'}):
-                data['tgt'].append(0)
-                data['rec'].append(0)
-                data['rec_yds'].append(0)
-                data['rec_td'].append(0)
-                data['rec_first_down'].append(0)
-                data['air_yards'].append(0)
-                data['air_yards_per_rec'].append(0)
-                data['yac'].append(0)
-                data['yac_per_rec'].append(0)
-                data['adot'].append(0)
-                data['broken_tackles'].append(0)
-                data['drops'].append(0)
-                data['drop_perc'].append(0)
-                data['rec_pass_rating'].append(0)
-            else:
-                data['tgt'].append(int(table_rows[i].find('td', {'data-stat': 'targets'}).text))
-                data['rec'].append(int(table_rows[i].find('td', {'data-stat': 'rec'}).text))
-                data['rec_yds'].append(int(table_rows[i].find('td', {'data-stat': 'rec_yds'}).text))
-                data['rec_td'].append(int(table_rows[i].find('td', {'data-stat': 'rec_td'}).text))
-                data['rec_first_down'].append(int(table_rows[i].find('td', {'data-stat': 'rec_first_down'}).text))
-                data['air_yards'].append(int(table_rows[i].find('td', {'data-stat': 'rec_air_yds'}).text))
-                data['air_yards_per_rec'].append(float(table_rows[i].find('td', {'data-stat': 'rec_air_yds_per_rec'}).text))
-                data['yac'].append(int(table_rows[i].find('td', {'data-stat': 'rec_yac'}).text))
-                data['yac_per_rec'].append(float(table_rows[i].find('td', {'data-stat': 'rec_yac_per_rec'}).text))
-                data['adot'].append(float(table_rows[i].find('td', {'data-stat': 'rec_adot'}).text))
-                data['broken_tackles'].append(int(table_rows[i].find('td', {'data-stat': 'rec_broken_tackles'}).text))
-                data['drops'].append(int(table_rows[i].find('td', {'data-stat': 'rec_drops'}).text))
-                data['drop_perc'].append(float(table_rows[i].find('td', {'data-stat': 'rec_drop_pct'}).text))
-                data['rec_pass_rating'].append(float(table_rows[i].find('td', {'data-stat': 'rec_pass_rating'}).text))
+            # if not table_rows[i].find('td', {'data-stat': 'targets'}):
+            #     data['tgt'].append(0)
+            #     data['rec'].append(0)
+            #     data['rec_yds'].append(0)
+            #     data['rec_td'].append(0)
+            #     data['rec_first_down'].append(0)
+            #     data['air_yds'].append(0)
+            #     data['air_yds_per_rec'].append(0)
+            #     data['yac'].append(0)
+            #     data['yac_per_rec'].append(0)
+            #     data['adot'].append(0)
+            #     data['broken_tackles'].append(0)
+            #     data['drops'].append(0)
+            #     data['drop_perc'].append(0)
+            #     data['rec_pass_rating'].append(0)
+            # else:
+            #     data['tgt'].append(int(table_rows[i].find('td', {'data-stat': 'targets'}).text) or 0)
+            #     data['rec'].append(int(table_rows[i].find('td', {'data-stat': 'rec'}).text) or 0)
+            #     data['rec_yds'].append(int(table_rows[i].find('td', {'data-stat': 'rec_yds'}).text) or 0)
+            #     data['rec_td'].append(int(table_rows[i].find('td', {'data-stat': 'rec_td'}).text) or 0)
+
+            #     if not table_rows[i].find('td', {'data-stat': 'rec_first_down'}) or table_rows[i].find('td', {'data-stat': 'rec_first_down'}).text == '':
+            #         data['rec_first_down'].append(int(0))
+            #     else:
+            #         data['rec_first_down'].append(int(table_rows[i].find('td', {'data-stat': 'rec_first_down'}).text) or 0)
+
+            #     data['air_yds'].append(int(table_rows[i].find('td', {'data-stat': 'rec_air_yds'}).text) or 0)
+
+            #     if not table_rows[i].find('td', {'data-stat': 'air_yards_per_rec'}) or table_rows[i].find('td', {'data-stat': 'air_yards_per_rec'}).text == '':
+            #         data['air_yds_per_rec'].append(int(0))
+            #     else:
+            #         data['air_yds_per_rec'].append(float(table_rows[i].find('td', {'data-stat': 'rec_air_yds_per_rec'}).text) or 0)
+
+            #     data['yac'].append(int(table_rows[i].find('td', {'data-stat': 'rec_yac'}).text) or 0)
+
+            #     if not table_rows[i].find('td', {'data-stat': 'rec_yac_per_rec'}) or table_rows[i].find('td', {'data-stat': 'rec_yac_per_rec'}).text == '':
+            #         data['yac_per_rec'].append(int(0))
+            #     else:
+            #         data['yac_per_rec'].append(float(table_rows[i].find('td', {'data-stat': 'rec_yac_per_rec'}).text) or 0)
+
+            #     if not table_rows[i].find('td', {'data-stat': 'adot'}) or table_rows[i].find('td', {'data-stat': 'adot'}).text == '':
+            #         data['adot'].append(int(0))
+            #     else:
+            #         data['adot'].append(float(table_rows[i].find('td', {'data-stat': 'rec_adot'}).text) or 0)
+
+            #     data['broken_tackles'].append(int(table_rows[i].find('td', {'data-stat': 'rec_broken_tackles'}).text) or 0)
+            #     data['drops'].append(int(table_rows[i].find('td', {'data-stat': 'rec_drops'}).text) or 0)
+            #     data['drop_perc'].append(float(table_rows[i].find('td', {'data-stat': 'rec_drop_pct'}).text) or 0)
+
+            #     if not table_rows[i].find('td', {'data-stat': 'rec_pass_rating'}) or table_rows[i].find('td', {'data-stat': 'rec_pass_rating'}).text == '':
+            #         data['rec_pass_rating'].append(int(0))
+            #     else:
+            #         data['rec_pass_rating'].append(float(table_rows[i].find('td', {'data-stat': 'rec_pass_rating'}).text) or 0)
 
     return pd.DataFrame(data=data)
 
