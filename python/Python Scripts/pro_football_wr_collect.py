@@ -11,8 +11,8 @@ import re
 
 
 
-def update_sql_isloaded(cursor, name):
-    statement = 'UPDATE profootball_wr_loaded SET isloaded = true WHERE name = \'' + re.sub("'", "''", name) + '\''
+def update_sql_isloaded(cursor, name, year):
+    statement = 'UPDATE profootball_wr_loaded SET isloaded = true WHERE name = \'' + re.sub("'", "''", name) + '\' and year = ' + str(year)
 
     cursor.execute(statement)
 
@@ -137,7 +137,7 @@ for player in all_players:
         
         # update wr_is_loaded table
 #        wr_is_loaded['isloaded'] = True
-        update_sql_isloaded(cursor, player_name)
+        update_sql_isloaded(cursor, player_name, season)
         conn.commit()
         time.sleep(3)
     except Exception as e:

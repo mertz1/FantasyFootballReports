@@ -10,8 +10,8 @@ import numpy as np
 import re
 
 
-def update_sql_isloaded(cursor, name):
-    statement = 'UPDATE profootball_qb_loaded SET isloaded = true WHERE name = \'' + re.sub("'", "''", name) + '\''
+def update_sql_isloaded(cursor, name, year):
+    statement = 'UPDATE profootball_qb_loaded SET isloaded = true WHERE name = \'' + re.sub("'", "''", name) + '\' and year = ' + str(year)
 
     cursor.execute(statement)
 
@@ -32,7 +32,7 @@ def update_player_url(cursor, name, url):
 
 #game_log = pgl.get_player_game_log(player = 'Justin Fields', position = 'QB', season = 2022)
 
-season = 2020
+season = 2022
 position = 'QB'
 
 
@@ -132,8 +132,9 @@ for player in all_players:
         
         # update qb_is_loaded table
 #        qb_is_loaded['isloaded'] = True
-        update_sql_isloaded(cursor, player_name)
+        update_sql_isloaded(cursor, player_name, season)
         conn.commit()
+        time.sleep(3)
     except Exception as e:
         print(e)
         sys.stdout.write("ERROR:" + player_name + " does not exist for QBs" + '\n')

@@ -11,8 +11,8 @@ import numpy as np
 import re
 
 
-def update_sql_isloaded(cursor, name):
-    statement = 'UPDATE profootball_qb_advanced_loaded SET isloaded = true WHERE name = \'' + re.sub("'", "''", name) + '\''
+def update_sql_isloaded(cursor, name, year):
+    statement = 'UPDATE profootball_qb_advanced_loaded SET isloaded = true WHERE name = \'' + re.sub("'", "''", name) + '\' and year = ' + str(year)
 
     cursor.execute(statement)
 
@@ -32,7 +32,7 @@ def update_player_url(cursor, name, url):
 
 #game_log = pagl.get_player_game_log(player = 'Justin Fields', position = 'QB', season = 2022)
 
-season = 2021
+season = 2023
 position = 'QB'
 
 
@@ -80,7 +80,7 @@ for player in all_players:
         
         ### Comment out if creating table:
         
-        existing_values = pd.read_sql('select * from profootball_qb_advanced where name = \'' + re.sub("'", "''", player_name) + '\' and year = ' + str(season) + ';', con=engine)
+        existing_values = pd.read_sql('select * from profootball_qb_advanced_upload where name = \'' + re.sub("'", "''", player_name) + '\' and year = ' + str(season) + ';', con=engine)
         print(existing_values)
 
         existing_values.set_index(['name', 'date'])
@@ -120,7 +120,7 @@ for player in all_players:
         dfnew.drop(columns=['Exist'], inplace=True) 
         print(dfnew)
 
-        dfnew.to_sql('profootball_qb_advanced', engine, if_exists='append', index=False)
+        dfnew.to_sql('profootball_qb_advanced_upload', engine, if_exists='append', index=False)
     
 
         #game_log.to_sql('profootball_qb_advanced', engine, if_exists='append', index=False)
@@ -146,8 +146,9 @@ for player in all_players:
         
         # update qb_is_loaded table
 #        qb_is_loaded['isloaded'] = True
-        update_sql_isloaded(cursor, player_name)
+        update_sql_isloaded(cursor, player_name, season)
         conn.commit()
+        time.sleep(3)
     except Exception as e:
         print(e)
         sys.stdout.write("ERROR:" + player_name + " unable to retrieve" + '\n')
