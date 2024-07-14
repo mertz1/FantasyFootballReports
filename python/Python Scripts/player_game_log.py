@@ -277,7 +277,6 @@ def wr_game_log(soup: BeautifulSoup, season: int) -> pd.DataFrame:
         'snaps': [],
         'snap_pct': [],
         'inactive': []
-
     }  # type: dict
 
     table_rows = soup.find('tbody').find_all('tr')
@@ -307,7 +306,7 @@ def wr_game_log(soup: BeautifulSoup, season: int) -> pd.DataFrame:
                 int(table_rows[i].find('td', {'data-stat': 'game_result'}).text.split(' ')[1].split('-')[1])
             )
             data['started'].append(None)
-
+#10
             data['rush_att'].append(None)
             data['rush_yds'].append(None)
             data['yds_per_att'].append(None)
@@ -324,8 +323,6 @@ def wr_game_log(soup: BeautifulSoup, season: int) -> pd.DataFrame:
             data['snaps'].append(None)
             data['snap_pct'].append(None)
             
-            elements = table_rows[i].find_all('td')
-            x = elements[len(elements) - 1].text
             data['inactive'].append(True)
 
 
@@ -351,7 +348,7 @@ def wr_game_log(soup: BeautifulSoup, season: int) -> pd.DataFrame:
                 started = True
 
             data['started'].append(started)
-
+#10
             if not table_rows[i].find('td', {'data-stat': 'rush_att'}):
                 data['rush_att'].append(int(0))
                 data['rush_yds'].append(int(0))

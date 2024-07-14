@@ -32,7 +32,7 @@ def update_player_url(cursor, name, url):
 
 #game_log = pgl.get_player_game_log(player = 'Justin Fields', position = 'WR', season = 2022)
 
-season = 2022
+season = 2021
 position = 'WR'
 
 ###
@@ -77,6 +77,8 @@ for player in all_players:
         # if already exists:
         ### TODO!!!! IF DOING AN ACTIVE SEASON, DON'T JUST SKIP IF DATA EXISTS!
         existing_values = pd.read_sql('select * from profootball_wr_upload where Name = \'' + re.sub("'", "''", player_name) + '\' and year = ' + str(season) + ';', con=engine)
+        # Set all "None" values to NaN
+        existing_values = existing_values.fillna(value=np.nan)
         print(existing_values)
 
 
@@ -96,17 +98,20 @@ for player in all_players:
         if url:
             update_player_url(cursor, player_name, url)
 
+        # move columns around to match table
+        game_log_inactive = game_log.pop('inactive')
         game_log['name'] = player_name
         game_log['year'] = season
+        game_log['inactive'] = game_log_inactive
+
+        game_log = game_log.fillna(value=np.nan)
         game_log.set_index(['name', 'date'])
         print(game_log)
 
-
         existing_values.set_index(['name', 'date'])
 
-
         dfnew  = pd.merge(game_log, existing_values, how='left', indicator='Exist')
-        dfnew  = dfnew .loc[dfnew ['Exist'] != 'both']
+        dfnew  = dfnew.loc[dfnew ['Exist'] != 'both']
         dfnew.drop(columns=['Exist'], inplace=True) 
         print(dfnew)
 
@@ -134,6 +139,7 @@ for player in all_players:
 #        wr_is_loaded['isloaded'] = True
         update_sql_isloaded(cursor, player_name)
         conn.commit()
+        time.sleep(3)
     except Exception as e:
         print(e)
         sys.stdout.write("ERROR:" + player_name + " unable to retrieve" + '\n')

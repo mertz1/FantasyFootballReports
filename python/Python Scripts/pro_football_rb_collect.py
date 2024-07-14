@@ -33,7 +33,7 @@ def update_player_url(cursor, name, url):
 
 #game_log = pgl.get_player_game_log(player = 'Justin Fields', position = 'QB', season = 2022)
 
-season = 2021
+season = 2023
 position = 'RB'
 
 ###
@@ -135,6 +135,7 @@ for player in all_players:
 #        qb_is_loaded['isloaded'] = True
         update_sql_isloaded(cursor, player_name)
         conn.commit()
+        time.sleep(3)
 
     except Exception as e:
         print(e)
