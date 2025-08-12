@@ -32,7 +32,7 @@ def update_player_url(cursor, name, url):
 
 #game_log = pgl.get_player_game_log(player = 'Justin Fields', position = 'QB', season = 2022)
 
-season = 2021
+season = 2024
 position = 'QB'
 
 
@@ -105,6 +105,9 @@ for player in all_players:
 
         existing_values.set_index(['name', 'date'])
 
+        ### TO DEBUG DATA MISMATCHES
+        # for col in game_log.keys():
+        #     print(f"{col}: game_log={game_log[col].dtype}, existing_values={existing_values[col].dtype}")
 
         dfnew  = pd.merge(game_log, existing_values, how='left', indicator='Exist')
         dfnew  = dfnew .loc[dfnew ['Exist'] != 'both']
@@ -131,8 +134,6 @@ for player in all_players:
         dfnew.to_sql('profootball_qb_upload', engine, if_exists='append', index=False)
         sys.stdout.write(player_name + " loaded" + '\n')
         
-        # update qb_is_loaded table
-#        qb_is_loaded['isloaded'] = True
         update_sql_isloaded(cursor, player_name, season)
         conn.commit()
         time.sleep(3)

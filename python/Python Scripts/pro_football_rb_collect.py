@@ -33,7 +33,7 @@ def update_player_url(cursor, name, url):
 
 #game_log = pgl.get_player_game_log(player = 'Justin Fields', position = 'QB', season = 2022)
 
-season = 2023
+season = 2024
 position = 'RB'
 
 ###
@@ -53,6 +53,7 @@ cursor = conn.cursor()
 
 cursor.execute("SELECT fdp.* FROM footballdb_players fdp " +
               # " join rb_weekly rw on rw.name = fdp.\"Name\" and fdp.\"Position\" = '" + position + "'"
+              #### I think this should be "fdp."Name"" but it is what it is right now
                " join profootball_rb_loaded fdpl on fdpl.name = fdp.\"profootball_name\""
               # " where rw.year = " + str(season) + 
                " and fdpl.\"year\" = " + str(season) + " and (isloaded = false or isloaded is null)  and ignoreupload = false"
@@ -135,7 +136,7 @@ for player in all_players:
 #        qb_is_loaded['isloaded'] = True
         update_sql_isloaded(cursor, player_name, season)
         conn.commit()
-        time.sleep(3)
+        time.sleep(3.5)
 
     except Exception as e:
         print(e)

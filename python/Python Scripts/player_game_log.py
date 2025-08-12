@@ -1,14 +1,62 @@
+import math
 import pandas as pd  # type: ignore
 from bs4 import BeautifulSoup
 import requests
+from enums.data_stat_type import Data_Stat_Type
 
 valid_positions = ['QB', 'RB', 'WR', 'TE']
 
+# Sections of the table:
+data_stat = 'data-stat'
+
+# data columns from website
+date = 'date'
+week_num = 'week_num'
+age = 'age'
+team = 'team_name_abbr'
+game_location = 'game_location'
+opp_name = 'opp_name_abbr'
+result = 'game_result'
+is_starter = 'is_starter'
+pass_cmp = 'pass_cmp'
+pass_att = 'pass_att'
+pass_cmp_perc = 'pass_cmp_pct'
+pass_yds = 'pass_yds'
+pass_td = 'pass_td'
+pass_int = 'pass_int'
+pass_rating = 'pass_rating'
+pass_sacked = 'pass_sacked'
+### NOT INCLUDED YET, BUT EXISTS:
+pass_yds_per_att = 'pass_yds_per_att'
+
+rush_att = 'rush_att'
+rush_yds = 'rush_yds'
+rush_yds_per_att = 'rush_yds_per_att'
+rush_td = 'rush_td'
+fumbles = 'fumbles_lost'
+snap_count = 'snap_counts_offense'
+snap_count_perc = 'snap_counts_off_pct'
+
+targets = 'targets'
+rec = 'rec'
+rec_yds = 'rec_yds'
+rec_td = 'rec_td'
+yds_per_rec = 'rec_yds_per_rec'
+catch_perc = 'catch_pct'
+yds_per_tgt = 'rec_yds_per_tgt'
+
+
+inactive_statuses = [
+    'Inactive' ,
+    'Did Not Play',
+    'Injured Reserve',
+    'COVID-19 List'
+]
 
 # function that returns a player's game log in a given season
 # player: player's full name (e.g. Tom Brady)
 # position: abbreviation (QB, RB, WR, TE only)
-def get_player_game_log(player: str, position: str, season: int, player_url: str = None) -> pd.DataFrame:
+def get_player_game_log(player: str, position: str, season: int, player_url: str = None, profootball_position: str = None) -> pd.DataFrame:
     """A function to retrieve a player's game log in a given season.
 
     Returns a pandas DataFrame of a NFL player's game log in a given season, including position-specific statistics.
@@ -32,11 +80,11 @@ def get_player_game_log(player: str, position: str, season: int, player_url: str
 
     if not player_url:
         # make request to find proper href
-        r1 = make_request_list(player, position, season)
+        r1 = make_request_list(player, profootball_position or position, season)
         player_list = get_soup(r1)
 
         # find href
-        href = get_href(player, position, season, player_list)
+        href = get_href(player, profootball_position or position, season, player_list)
 
         # make HTTP request and extract HTML
         new_player_url = build_gamelog_url(href)
@@ -55,6 +103,8 @@ def get_player_game_log(player: str, position: str, season: int, player_url: str
         return wr_game_log(game_log, season), new_player_url
     elif 'RB' in position:
         return rb_game_log(game_log), new_player_url
+    elif 'TE' in position:
+        return te_game_log(game_log), new_player_url
 
 
 # helper function that gets the player's href
@@ -88,9 +138,115 @@ def make_request_player(url: str, season: int):
 def get_soup(request):
     return BeautifulSoup(request.text, 'html.parser')
 
+def getValue(tableRow, data_stat_value, type):
+    match type:
+        case Data_Stat_Type.INT:
+            if not tableRow.find('td', {data_stat: data_stat_value}):
+                return math.nan
+            return int(tableRow.find('td', {data_stat: data_stat_value}).text or 0)
+        case Data_Stat_Type.FLOAT:
+            if not tableRow.find('td', {data_stat: data_stat_value}):
+                return math.nan
+            return float(tableRow.find('td', {data_stat: data_stat_value}).text or 0)
+        case Data_Stat_Type.RESULT:
+            if not tableRow.find('td', {data_stat: data_stat_value}):
+                return math.nan
+            return tableRow.find('td', {data_stat: data_stat_value}).text.split(' ')[0]
+        case Data_Stat_Type.TEAM_PTS:
+            if not tableRow.find('td', {data_stat: data_stat_value}):
+                return math.nan
+            return int(tableRow.find('td', {data_stat: data_stat_value}).text.split(' ')[1].split('-')[0])
+        case Data_Stat_Type.OPP_PTS:
+            if not tableRow.find('td', {data_stat: data_stat_value}):
+                return math.nan
+            return int(tableRow.find('td', {data_stat: data_stat_value}).text.split(' ')[1].split('-')[1])
+        case Data_Stat_Type.BOOLEAN:
+            if not tableRow.find('td', {data_stat: data_stat_value}):
+                return pd.NA
+            if not tableRow.find('td', {data_stat: data_stat_value}).text:
+                return False
+            if tableRow.find('td', {data_stat: data_stat_value}).text in inactive_statuses:
+                return False
+            return True
+        case _:
+            if not tableRow.find('td', {data_stat: data_stat_value}):
+                return pd.NA
+            return tableRow.find('td', {data_stat: data_stat_value}).text
+
+def fetch_week_info(data, table_row):
+    data['date'].append(getValue(table_row, date, None, None))
+    data['week'].append(getValue(table_row, week_num, Data_Stat_Type.INT, 0))
+    data['age'].append(getValue(table_row, age, Data_Stat_Type.FLOAT, 0))
+    data['team'].append(getValue(table_row, team, None, None))
+    data['game_location'].append(getValue(table_row, game_location, None, None))
+    data['opp'].append(getValue(table_row, opp_name, None, None))
+    data['result'].append(getValue(table_row, result, Data_Stat_Type.RESULT, None))
+    data['team_pts'].append(getValue(table_row, result, Data_Stat_Type.TEAM_PTS, None))
+    data['opp_pts'].append(getValue(table_row, result, Data_Stat_Type.OPP_PTS, None))
+    data['started'].append(getValue(table_row, is_starter, Data_Stat_Type.BOOLEAN, None))
+
+
+def fetch_passing(data, table_row):
+    data['cmp'].append(getValue(table_row, pass_cmp, Data_Stat_Type.INT, 0))
+    data['att'].append(getValue(table_row, pass_att, Data_Stat_Type.INT, 0))
+    data['cmp_perc'].append(getValue(table_row, pass_cmp_perc, Data_Stat_Type.FLOAT, 0))
+    data['pass_yds'].append(getValue(table_row, pass_yds, Data_Stat_Type.INT, 0))
+    data['pass_td'].append(getValue(table_row, pass_td, Data_Stat_Type.INT, 0))
+    data['int'].append(getValue(table_row, pass_int, Data_Stat_Type.INT, 0))
+    data['rating'].append(getValue(table_row, pass_rating, Data_Stat_Type.FLOAT, 0))
+    data['sacked'].append(getValue(table_row, pass_sacked, Data_Stat_Type.INT, 0))
+
+def fetch_rushing(data, table_row):
+    data['rush_att'].append(getValue(table_row, rush_att, Data_Stat_Type.INT, 0))
+    data['rush_yds'].append(getValue(table_row, rush_yds, Data_Stat_Type.INT, 0))
+    data['rush_td'].append(getValue(table_row, rush_td, Data_Stat_Type.INT, 0))
+    data['yds_per_att'].append(getValue(table_row, rush_yds_per_att, Data_Stat_Type.INT, 0))
+
+def fetch_fumble_snaps(data, table_row):
+    data['fumbles'].append(getValue(table_row, fumbles, Data_Stat_Type.INT, 0))
+    data['snaps'].append(getValue(table_row, snap_count, Data_Stat_Type.INT, 0))
+    data['snap_pct'].append(getValue(table_row, snap_count_perc, Data_Stat_Type.FLOAT, 0))
+
+def fetch_receiving(data, table_row):
+    data['tgt'].append(getValue(table_row, targets, Data_Stat_Type.INT, 0))
+    data['rec'].append(getValue(table_row, rec, Data_Stat_Type.INT, 0))
+    data['rec_yds'].append(getValue(table_row, rec_yds, Data_Stat_Type.INT, 0))
+    data['rec_td'].append(getValue(table_row, rec_td, Data_Stat_Type.INT, 0))
+    data['yds_per_rec'].append(getValue(table_row, yds_per_rec, Data_Stat_Type.FLOAT, 0))
+    data['ctch_perc'].append(getValue(table_row, catch_perc, Data_Stat_Type.FLOAT, 0))
+                # data['ctch_perc'].append(float(table_rows[i].find('td', {data_stat: catch_perc}).text.replace('%', '') or 0))
+    data['yds_per_tgt'].append(getValue(table_row, yds_per_tgt, Data_Stat_Type.FLOAT, 0))
 
 # helper function that takes a BeautifulSoup object and converts it into a pandas dataframe containing a QB game log
 def qb_game_log(soup: BeautifulSoup) -> pd.DataFrame:
+
+    information = [
+        [ 'date', date, None ],
+        [ 'week', week_num, Data_Stat_Type.INT],
+        [ 'age', age, None ],
+        [ 'team', team, None ],
+        [ 'game_location', game_location, None ],
+        [ 'opp', opp_name, None ],
+        [ 'result', result, Data_Stat_Type.RESULT ],
+        [ 'team_pts', result, Data_Stat_Type.TEAM_PTS],
+        [ 'opp_pts', result, Data_Stat_Type.OPP_PTS],
+        [ 'started', is_starter, Data_Stat_Type.BOOLEAN ],
+        [ 'cmp', pass_cmp, Data_Stat_Type.INT],
+        [ 'att', pass_att, Data_Stat_Type.INT],
+        [ 'cmp_perc', pass_cmp_perc, Data_Stat_Type.FLOAT],
+        [ 'pass_yds', pass_yds, Data_Stat_Type.INT],
+        [ 'pass_td', pass_td, Data_Stat_Type.INT],
+        [ 'int', pass_int, Data_Stat_Type.INT],
+        [ 'rating', pass_rating, Data_Stat_Type.FLOAT],
+        [ 'sacked', pass_sacked, Data_Stat_Type.INT],
+        [ 'rush_att', rush_att, Data_Stat_Type.INT],
+        [ 'rush_yds', rush_yds, Data_Stat_Type.INT],
+        [ 'rush_td', rush_td, Data_Stat_Type.INT],
+        [ 'fumbles', fumbles, Data_Stat_Type.INT ],
+        [ 'snaps', snap_count, Data_Stat_Type.FLOAT ],
+        [ 'snap_pct', snap_count_perc, Data_Stat_Type.FLOAT ],
+    ]
+
     # Most relevant QB stats, in my opinion. Could adjust if necessary
     data = {
         'date': [],
@@ -117,130 +273,46 @@ def qb_game_log(soup: BeautifulSoup) -> pd.DataFrame:
         'fumbles': [],
         'snaps': [],
         'snap_pct': [],
-        'inactive': []
+        'inactive': [],
     }  # type: dict
 
     table_rows = soup.find('tbody').find_all('tr')
 
     # ignore inactive or DNP games
     to_ignore = []
+    to_skip = []
     for i in range(len(table_rows)):
         elements = table_rows[i].find_all('td')
         x = elements[len(elements) - 1].text
-        if x == 'Inactive' or x == 'Did Not Play' or x == 'Injured Reserve' or x == 'COVID-19 List':
+        if len(elements) < 5:
+            ## a line saying a player was moved will have 4 elements, skip this row
+            to_skip.append(i)
+        if x in inactive_statuses:
             to_ignore.append(i)
+
 
     # adding data to data dictionary
     for i in range(len(table_rows)):
+        if i in to_skip:
+            continue
         if i in to_ignore:
-            data['date'].append(table_rows[i].find('td', {'data-stat': 'game_date'}).text)
-            data['week'].append(int(table_rows[i].find('td', {'data-stat': 'week_num'}).text))
-            data['age'].append(float(table_rows[i].find('td', {'data-stat': 'age'}).text or 0))
-            data['team'].append(table_rows[i].find('td', {'data-stat': 'team'}).text)
-            data['game_location'].append(table_rows[i].find('td', {'data-stat': 'game_location'}).text)
-            data['opp'].append(table_rows[i].find('td', {'data-stat': 'opp'}).text)
-            data['result'].append(table_rows[i].find('td', {'data-stat': 'game_result'}).text.split(' ')[0])
-            data['team_pts'].append(
-                int(table_rows[i].find('td', {'data-stat': 'game_result'}).text.split(' ')[1].split('-')[0])
-            )
-            data['opp_pts'].append(
-                int(table_rows[i].find('td', {'data-stat': 'game_result'}).text.split(' ')[1].split('-')[1])
-            )
-
-            data['started'].append(None)
-
-            #10
-
-            data['cmp'].append(None)
-            data['att'].append(None)
-            data['cmp_perc'].append(None)
-            data['pass_yds'].append(None)
-            data['pass_td'].append(None)
-            data['int'].append(None)
-            data['rating'].append(None)
-            data['sacked'].append(None)
-
-            #18
-            data['rush_att'].append(None)
-            data['rush_yds'].append(None)
-            data['rush_td'].append(None)
-            data['fumbles'].append(None)
-            data['snaps'].append(None)
-            data['snap_pct'].append(None)
-
             data['inactive'].append(True)
+        else:
+            data['inactive'].append(False)
 
 
-        if i not in to_ignore:
-            try: 
-                data['date'].append(table_rows[i].find('td', {'data-stat': 'game_date'}).text)
-                data['week'].append(int(table_rows[i].find('td', {'data-stat': 'week_num'}).text or 0))
-                data['age'].append(float(table_rows[i].find('td', {'data-stat': 'age'}).text or 0))
-                data['team'].append(table_rows[i].find('td', {'data-stat': 'team'}).text)
-                data['game_location'].append(table_rows[i].find('td', {'data-stat': 'game_location'}).text)
-                data['opp'].append(table_rows[i].find('td', {'data-stat': 'opp'}).text)
-                data['result'].append(table_rows[i].find('td', {'data-stat': 'game_result'}).text.split(' ')[0])
-                data['team_pts'].append(
-                    int(table_rows[i].find('td', {'data-stat': 'game_result'}).text.split(' ')[1].split('-')[0])
-                )
-                data['opp_pts'].append(
-                    int(table_rows[i].find('td', {'data-stat': 'game_result'}).text.split(' ')[1].split('-')[1])
-                )
 
-                #started logic
-                if not table_rows[i].find('td', {'data-stat': 'gs'}).text:
-                    started = False
-                else:
-                    started = True
-                data['started'].append(started)
+        try: 
+            for column in information:
+                data_frame_column = column[0]
+                web_column = column[1]
+                type_ = column[2]
 
-                #10
+                data[data_frame_column].append(getValue(table_rows[i], web_column, type_))
 
-                if not table_rows[i].find('td', {'data-stat': 'pass_cmp'}):
-                    data['cmp'].append(int(0))
-                    data['att'].append(int(0))
-                    data['cmp_perc'].append(float(0))
-                    data['pass_yds'].append(int(0))
-                    data['pass_td'].append(int(0))
-                    data['int'].append(int(0))
-                    data['rating'].append(float(0))
-                    data['sacked'].append(int(0))
-                else:
-                    data['cmp'].append(int(table_rows[i].find('td', {'data-stat': 'pass_cmp'}).text or 0))
-                    data['att'].append(int(table_rows[i].find('td', {'data-stat': 'pass_att'}).text or 0))
-                    data['cmp_perc'].append(float(table_rows[i].find('td', {'data-stat': 'pass_cmp_perc'}).text or 0))
-                    data['pass_yds'].append(int(table_rows[i].find('td', {'data-stat': 'pass_yds'}).text or 0))
-                    data['pass_td'].append(int(table_rows[i].find('td', {'data-stat': 'pass_td'}).text or 0))
-                    data['int'].append(int(table_rows[i].find('td', {'data-stat': 'pass_int'}).text or 0))
-                    data['rating'].append(float(table_rows[i].find('td', {'data-stat': 'pass_rating'}).text or 0))
-                    data['sacked'].append(int(table_rows[i].find('td', {'data-stat': 'pass_sacked'}).text or 0))
-
-                #18
-
-                if not table_rows[i].find('td', {'data-stat': 'rush_att'}):
-                    data['rush_att'].append(0)
-                    data['rush_yds'].append(0)
-                    data['rush_td'].append(0)
-                else:
-                    data['rush_att'].append(int(table_rows[i].find('td', {'data-stat': 'rush_att'}).text or 0))
-                    data['rush_yds'].append(int(table_rows[i].find('td', {'data-stat': 'rush_yds'}).text or 0))
-                    data['rush_td'].append(int(table_rows[i].find('td', {'data-stat': 'rush_td'}).text or 0))
-
-                #21
-
-                if not table_rows[i].find('td', {'data-stat': 'fumbles_lost'}):
-                    data['fumbles'].append(0)
-                else:
-                    data['fumbles'].append(int(table_rows[i].find('td', {'data-stat': 'fumbles_lost'}).text or 0))
-
-
-                data['snaps'].append(int(table_rows[i].find('td', {'data-stat': 'offense'}).text or 0))
-                data['snap_pct'].append(float(table_rows[i].find('td', {'data-stat': 'off_pct'}).text.replace('%', '') or 0))
-            
-                data['inactive'].append(False)
-                #25
-            except Exception as e:
-                print(e)
+          
+        except Exception as e:
+            print(e)
 
     print(data)
     return pd.DataFrame(data=data)
@@ -250,6 +322,33 @@ def qb_game_log(soup: BeautifulSoup) -> pd.DataFrame:
 def wr_game_log(soup: BeautifulSoup, season: int) -> pd.DataFrame:
     # Most relevant WR stats, in my opinion.
     # Could adjust if necessary (maybe figure out how to incorporate rushing stats?)
+
+    information = [
+        [ 'date', date, None ],
+        [ 'week', week_num, Data_Stat_Type.INT],
+        [ 'age', age, Data_Stat_Type.INT],
+        [ 'team', team, None ],
+        [ 'game_location', game_location, None ],
+        [ 'opp', opp_name, None ],
+        [ 'result', result, Data_Stat_Type.RESULT ],
+        [ 'team_pts', result, Data_Stat_Type.TEAM_PTS],
+        [ 'opp_pts', result, Data_Stat_Type.OPP_PTS],
+        [ 'started', is_starter, Data_Stat_Type.BOOLEAN ],
+        [ 'rush_att', rush_att, Data_Stat_Type.INT],
+        [ 'rush_yds', rush_yds, Data_Stat_Type.INT],
+        [ 'yds_per_att', rush_yds_per_att, Data_Stat_Type.FLOAT ],
+        [ 'rush_td', rush_td, Data_Stat_Type.INT],
+        [ 'tgt', targets, Data_Stat_Type.FLOAT ],
+        [ 'rec', rec, Data_Stat_Type.FLOAT ],
+        [ 'rec_yds', rec_yds, Data_Stat_Type.FLOAT ],
+        [ 'rec_td', rec_td, Data_Stat_Type.FLOAT ],
+        [ 'yds_per_rec', yds_per_rec, Data_Stat_Type.FLOAT ],
+        [ 'ctch_perc', catch_perc, Data_Stat_Type.FLOAT ],
+        [ 'yds_per_tgt', yds_per_tgt, Data_Stat_Type.FLOAT ],
+        [ 'fumbles', fumbles, Data_Stat_Type.FLOAT ],
+        [ 'snaps', snap_count, Data_Stat_Type.FLOAT ],
+        [ 'snap_pct', snap_count_perc, Data_Stat_Type.FLOAT ],
+    ]
 
     data = {
         'date': [],
@@ -276,8 +375,8 @@ def wr_game_log(soup: BeautifulSoup, season: int) -> pd.DataFrame:
         'fumbles': [],
         'snaps': [],
         'snap_pct': [],
-        'inactive': []
-    }  # type: dict
+        'inactive': [],
+    }
 
     table_rows = soup.find('tbody').find_all('tr')
 
@@ -292,104 +391,133 @@ def wr_game_log(soup: BeautifulSoup, season: int) -> pd.DataFrame:
     # adding data to data dictionray
     for i in range(len(table_rows)):
         if i in to_ignore:
-            data['date'].append(table_rows[i].find('td', {'data-stat': 'game_date'}).text)
-            data['week'].append(int(table_rows[i].find('td', {'data-stat': 'week_num'}).text))
-            data['age'].append(float(table_rows[i].find('td', {'data-stat': 'age'}).text or 0))
-            data['team'].append(table_rows[i].find('td', {'data-stat': 'team'}).text)
-            data['game_location'].append(table_rows[i].find('td', {'data-stat': 'game_location'}).text)
-            data['opp'].append(table_rows[i].find('td', {'data-stat': 'opp'}).text)
-            data['result'].append(table_rows[i].find('td', {'data-stat': 'game_result'}).text.split(' ')[0])
-            data['team_pts'].append(
-                int(table_rows[i].find('td', {'data-stat': 'game_result'}).text.split(' ')[1].split('-')[0])
-            )
-            data['opp_pts'].append(
-                int(table_rows[i].find('td', {'data-stat': 'game_result'}).text.split(' ')[1].split('-')[1])
-            )
-            data['started'].append(None)
-#10
-            data['rush_att'].append(None)
-            data['rush_yds'].append(None)
-            data['yds_per_att'].append(None)
-            data['rush_td'].append(None)
-
-            data['tgt'].append(None)
-            data['rec'].append(None)
-            data['rec_yds'].append(None)
-            data['rec_td'].append(None)
-            data['yds_per_rec'].append(None)
-            data['ctch_perc'].append(None)
-            data['yds_per_tgt'].append(None)
-            data['fumbles'].append(None)
-            data['snaps'].append(None)
-            data['snap_pct'].append(None)
-            
             data['inactive'].append(True)
-
-
-        if i not in to_ignore:
-            data['date'].append(table_rows[i].find('td', {'data-stat': 'game_date'}).text)
-            data['week'].append(int(table_rows[i].find('td', {'data-stat': 'week_num'}).text))
-            data['age'].append(float(table_rows[i].find('td', {'data-stat': 'age'}).text or 0))
-            data['team'].append(table_rows[i].find('td', {'data-stat': 'team'}).text)
-            data['game_location'].append(table_rows[i].find('td', {'data-stat': 'game_location'}).text)
-            data['opp'].append(table_rows[i].find('td', {'data-stat': 'opp'}).text)
-            data['result'].append(table_rows[i].find('td', {'data-stat': 'game_result'}).text.split(' ')[0])
-            data['team_pts'].append(
-                int(table_rows[i].find('td', {'data-stat': 'game_result'}).text.split(' ')[1].split('-')[0])
-            )
-            data['opp_pts'].append(
-                int(table_rows[i].find('td', {'data-stat': 'game_result'}).text.split(' ')[1].split('-')[1])
-            )
-
-            #started logic
-            if not table_rows[i].find('td', {'data-stat': 'gs'}).text:
-                started = False
-            else:
-                started = True
-
-            data['started'].append(started)
-#10
-            if not table_rows[i].find('td', {'data-stat': 'rush_att'}):
-                data['rush_att'].append(int(0))
-                data['rush_yds'].append(int(0))
-                data['yds_per_att'].append(float(0))
-                data['rush_td'].append(int(0))
-            else:
-                data['rush_att'].append(int(table_rows[i].find('td', {'data-stat': 'rush_att'}).text or 0))
-                data['rush_yds'].append(int(table_rows[i].find('td', {'data-stat': 'rush_yds'}).text or 0))
-                data['yds_per_att'].append(float(table_rows[i].find('td', {'data-stat': 'rush_yds_per_att'}).text or 0))
-                data['rush_td'].append(int(table_rows[i].find('td', {'data-stat': 'rush_td'}).text or 0))
-
-            if not table_rows[i].find('td', {'data-stat': 'targets'}):
-                data['tgt'].append(int(0))
-                data['rec'].append(int(0))
-                data['rec_yds'].append(int(0))
-                data['rec_td'].append(int(0))
-                data['yds_per_rec'].append(float(0))
-                data['ctch_perc'].append(float(0))
-                data['yds_per_tgt'].append(float(0))
-            else:
-                data['tgt'].append(int(table_rows[i].find('td', {'data-stat': 'targets'}).text or 0))
-                data['rec'].append(int(table_rows[i].find('td', {'data-stat': 'rec'}).text or 0))
-                data['rec_yds'].append(int(table_rows[i].find('td', {'data-stat': 'rec_yds'}).text or 0))
-                data['rec_td'].append(int(table_rows[i].find('td', {'data-stat': 'rec_td'}).text or 0))
-                data['yds_per_rec'].append(float(table_rows[i].find('td', {'data-stat': 'rec_yds_per_rec'}).text or 0))
-                data['ctch_perc'].append(float(table_rows[i].find('td', {'data-stat': 'catch_pct'}).text.replace('%', '') or 0))
-                data['yds_per_tgt'].append(float(table_rows[i].find('td', {'data-stat': 'rec_yds_per_tgt'}).text or 0))
-
-            if not table_rows[i].find('td', {'data-stat': 'fumbles_lost'}):
-                data['fumbles'].append(int(0))
-            else:
-                data['fumbles'].append(int(table_rows[i].find('td', {'data-stat': 'fumbles_lost'}).text or 0))
-
-            data['snaps'].append(int(table_rows[i].find('td', {'data-stat': 'offense'}).text or 0))
-            data['snap_pct'].append(float(table_rows[i].find('td', {'data-stat': 'off_pct'}).text.replace('%', '') or 0))
-
+        else:
             data['inactive'].append(False)
+
+
+        for column in information:
+            data_frame_column = column[0]
+            web_column = column[1]
+            type_ = column[2]
+
+            data[data_frame_column].append(getValue(table_rows[i], web_column, type_))
+
+    print(data)
     return pd.DataFrame(data=data)
 
 
 def rb_game_log(soup: BeautifulSoup) -> pd.DataFrame:
+    # Most relevant RB stats, in my opinion. Could adjust if necessary
+    information = [
+        [ 'date', date, None ],
+        [ 'week', week_num, Data_Stat_Type.INT],
+        [ 'age', age, Data_Stat_Type.INT],
+        [ 'team', team, None ],
+        [ 'game_location', game_location, None ],
+        [ 'opp', opp_name, None ],
+        [ 'result', result, Data_Stat_Type.RESULT ],
+        [ 'team_pts', result, Data_Stat_Type.TEAM_PTS],
+        [ 'opp_pts', result, Data_Stat_Type.OPP_PTS],
+        [ 'started', is_starter, Data_Stat_Type.BOOLEAN ],
+        [ 'rush_att', rush_att, Data_Stat_Type.INT],
+        [ 'rush_yds', rush_yds, Data_Stat_Type.INT],
+        [ 'yds_per_att', rush_yds_per_att, Data_Stat_Type.FLOAT ],
+        [ 'rush_td', rush_td, Data_Stat_Type.INT],
+        [ 'tgt', targets, Data_Stat_Type.FLOAT ],
+        [ 'rec', rec, Data_Stat_Type.FLOAT ],
+        [ 'rec_yds', rec_yds, Data_Stat_Type.FLOAT ],
+        [ 'rec_td', rec_td, Data_Stat_Type.FLOAT ],
+        [ 'yds_per_rec', yds_per_rec, Data_Stat_Type.FLOAT ],
+        [ 'ctch_perc', catch_perc, Data_Stat_Type.FLOAT ],
+        [ 'yds_per_tgt', yds_per_tgt, Data_Stat_Type.FLOAT ],
+        [ 'fumbles', fumbles, Data_Stat_Type.FLOAT ],
+        [ 'snaps', snap_count, Data_Stat_Type.FLOAT ],
+        [ 'snap_pct', snap_count_perc, Data_Stat_Type.FLOAT ],
+    ]
+
+    data = {
+        'date': [],
+        'week': [],
+        'age': [],
+        'team': [],
+        'game_location': [],
+        'opp': [],
+        'result': [],
+        'team_pts': [],
+        'opp_pts': [],
+        'started': [],
+        'rush_att': [],
+        'rush_yds': [],
+        'yds_per_att': [],
+        'rush_td': [],
+        'tgt': [],
+        'rec': [],
+        'rec_yds': [],
+        'rec_td': [],
+        'yds_per_rec': [],
+        'ctch_perc': [],
+        'yds_per_tgt': [],
+        'fumbles': [],
+        'snaps': [],
+        'snap_pct': [],
+        'inactive': [],
+    }  # type: dict
+
+    table_rows = soup.find('tbody').find_all('tr')
+
+    # ignore inactive or DNP games
+    to_ignore = []
+    for i in range(len(table_rows)):
+        elements = table_rows[i].find_all('td')
+        x = elements[len(elements) - 1].text
+        if x == 'Inactive' or x == 'Did Not Play' or x == 'Injured Reserve' or x == 'COVID-19 List' or x is None:
+            to_ignore.append(i)
+
+    # adding data to data dictionary
+    for i in range(len(table_rows)):
+        if i in to_ignore:
+            data['inactive'].append(True)
+        else:
+            data['inactive'].append(False)
+
+        # if i not in to_ignore:
+        for column in information:
+            data_frame_column = column[0]
+            web_column = column[1]
+            type_ = column[2]
+
+            data[data_frame_column].append(getValue(table_rows[i], web_column, type_))
+            
+    return pd.DataFrame(data=data)
+
+def te_game_log(soup: BeautifulSoup) -> pd.DataFrame:
+
+    information = [
+        [ 'date', date, None],
+        [ 'week', week_num, Data_Stat_Type.INT],
+        [ 'team', team, None ],
+        [ 'game_location', game_location, None ],
+        [ 'opp', opp_name, None ],
+        [ 'result', result, Data_Stat_Type.RESULT ],
+        [ 'team_pts', result, Data_Stat_Type.TEAM_PTS ],
+        [ 'opp_pts', result, Data_Stat_Type.OPP_PTS ],
+        [ 'started', is_starter, Data_Stat_Type.BOOLEAN ],
+        [ 'rush_att', rush_att, Data_Stat_Type.INT ],
+        [ 'rush_yds', rush_yds, Data_Stat_Type.INT ],
+        [ 'yds_per_att', rush_yds_per_att, Data_Stat_Type.FLOAT ],
+        [ 'rush_td', rush_td, Data_Stat_Type.INT ],
+        [ 'tgt', targets, Data_Stat_Type.FLOAT ],
+        [ 'rec', rec, Data_Stat_Type.FLOAT ],
+        [ 'rec_yds', rec_yds, Data_Stat_Type.FLOAT ],
+        [ 'rec_td', rec_td, Data_Stat_Type.FLOAT ],
+        [ 'yds_per_rec', yds_per_rec, Data_Stat_Type.FLOAT ],
+        [ 'ctch_perc', catch_perc, Data_Stat_Type.FLOAT ],
+        [ 'yds_per_tgt', yds_per_tgt, Data_Stat_Type.FLOAT ],
+        [ 'fumbles', fumbles, Data_Stat_Type.FLOAT ],
+        [ 'snaps', snap_count, Data_Stat_Type.FLOAT ],
+        [ 'snap_pct', snap_count_perc, Data_Stat_Type.FLOAT ],
+    ]
     # Most relevant RB stats, in my opinion. Could adjust if necessary
     data = {
         'date': [],
@@ -426,108 +554,26 @@ def rb_game_log(soup: BeautifulSoup) -> pd.DataFrame:
     for i in range(len(table_rows)):
         elements = table_rows[i].find_all('td')
         x = elements[len(elements) - 1].text
-        if x == 'Inactive' or x == 'Did Not Play' or x == 'Injured Reserve' or x == 'COVID-19 List':
+        if x == 'Inactive' or x == 'Did Not Play' or x == 'Injured Reserve' or x == 'COVID-19 List' or x is None:
             to_ignore.append(i)
 
-    # adding data to data dictionary
+    # adding data to data dictionray
     for i in range(len(table_rows)):
         if i in to_ignore:
-            data['date'].append(table_rows[i].find('td', {'data-stat': 'game_date'}).text)
-            data['week'].append(int(table_rows[i].find('td', {'data-stat': 'week_num'}).text))
-            data['age'].append(float(table_rows[i].find('td', {'data-stat': 'age'}).text or 0))
-            data['team'].append(table_rows[i].find('td', {'data-stat': 'team'}).text)
-            data['game_location'].append(table_rows[i].find('td', {'data-stat': 'game_location'}).text)
-            data['opp'].append(table_rows[i].find('td', {'data-stat': 'opp'}).text)
-            data['result'].append(table_rows[i].find('td', {'data-stat': 'game_result'}).text.split(' ')[0])
-            data['team_pts'].append(
-                int(table_rows[i].find('td', {'data-stat': 'game_result'}).text.split(' ')[1].split('-')[0])
-            )
-            data['opp_pts'].append(
-                int(table_rows[i].find('td', {'data-stat': 'game_result'}).text.split(' ')[1].split('-')[1])
-            )
-            data['started'].append(False)
-
-            data['rush_att'].append(None)
-            data['rush_yds'].append(None)
-            data['yds_per_att'].append(None)
-            data['rush_td'].append(None)
-
-            data['tgt'].append(None)
-            data['rec'].append(None)
-            data['rec_yds'].append(None)
-            data['rec_td'].append(None)
-            data['yds_per_rec'].append(None)
-            data['ctch_perc'].append(None)
-            data['yds_per_tgt'].append(None)
-            data['fumbles'].append(None)
-            data['snaps'].append(None)
-            data['snap_pct'].append(None)
-            
-            elements = table_rows[i].find_all('td')
-            x = elements[len(elements) - 1].text
             data['inactive'].append(True)
+        else:
+            data['inactive'].append(False)
 
         if i not in to_ignore:
-            data['date'].append(table_rows[i].find('td', {'data-stat': 'game_date'}).text)
-            data['week'].append(int(table_rows[i].find('td', {'data-stat': 'week_num'}).text))
-            data['age'].append(float(table_rows[i].find('td', {'data-stat': 'age'}).text or 0))
-            data['team'].append(table_rows[i].find('td', {'data-stat': 'team'}).text)
-            data['game_location'].append(table_rows[i].find('td', {'data-stat': 'game_location'}).text)
-            data['opp'].append(table_rows[i].find('td', {'data-stat': 'opp'}).text)
-            data['result'].append(table_rows[i].find('td', {'data-stat': 'game_result'}).text.split(' ')[0])
-            data['team_pts'].append(
-                int(table_rows[i].find('td', {'data-stat': 'game_result'}).text.split(' ')[1].split('-')[0])
-            )
-            data['opp_pts'].append(
-                int(table_rows[i].find('td', {'data-stat': 'game_result'}).text.split(' ')[1].split('-')[1])
-            )
+            for column in information:
+                data_frame_column = column[0]
+                web_column = column[1]
+                type_ = column[2]
 
-            #started logic
-            if not table_rows[i].find('td', {'data-stat': 'gs'}).text:
-                started = False
-            else:
-                started = True
+                data[data_frame_column].append(getValue(table_rows[i], web_column, type_))
 
-            data['started'].append(started)
-
-            if not table_rows[i].find('td', {'data-stat': 'rush_att'}):
-                data['rush_att'].append(int(0))
-                data['rush_yds'].append(int(0))
-                data['yds_per_att'].append(float(0))
-                data['rush_td'].append(int(0))
-            else:
-                data['rush_att'].append(int(table_rows[i].find('td', {'data-stat': 'rush_att'}).text or 0))
-                data['rush_yds'].append(int(table_rows[i].find('td', {'data-stat': 'rush_yds'}).text or 0))
-                data['yds_per_att'].append(float(table_rows[i].find('td', {'data-stat': 'rush_yds_per_att'}).text or 0))
-                data['rush_td'].append(int(table_rows[i].find('td', {'data-stat': 'rush_td'}).text or 0))
-
-            if not table_rows[i].find('td', {'data-stat': 'targets'}):
-                data['tgt'].append(int(0))
-                data['rec'].append(int(0))
-                data['rec_yds'].append(int(0))
-                data['rec_td'].append(int(0))
-                data['yds_per_rec'].append(float(0))
-                data['ctch_perc'].append(float(0))
-                data['yds_per_tgt'].append(float(0))
-            else:
-                data['tgt'].append(int(table_rows[i].find('td', {'data-stat': 'targets'}).text or 0))
-                data['rec'].append(int(table_rows[i].find('td', {'data-stat': 'rec'}).text or 0))
-                data['rec_yds'].append(int(table_rows[i].find('td', {'data-stat': 'rec_yds'}).text or 0))
-                data['rec_td'].append(int(table_rows[i].find('td', {'data-stat': 'rec_td'}).text or 0))
-                data['yds_per_rec'].append(float(table_rows[i].find('td', {'data-stat': 'rec_yds_per_rec'}).text or 0))
-                data['ctch_perc'].append(float(table_rows[i].find('td', {'data-stat': 'catch_pct'}).text.replace('%', '') or 0))
-                data['yds_per_tgt'].append(float(table_rows[i].find('td', {'data-stat': 'rec_yds_per_tgt'}).text or 0))
-
-            if not table_rows[i].find('td', {'data-stat': 'fumbles_lost'}):
-                data['fumbles'].append(int(0))
-            else:
-                data['fumbles'].append(int(table_rows[i].find('td', {'data-stat': 'fumbles_lost'}).text or 0))
-
-            data['snaps'].append(int(table_rows[i].find('td', {'data-stat': 'offense'}).text or 0))
-            data['snap_pct'].append(float(table_rows[i].find('td', {'data-stat': 'off_pct'}).text.replace('%', '') or 0))
-            data['inactive'].append(False)
-            
     return pd.DataFrame(data=data)
+
 
 
 def main():

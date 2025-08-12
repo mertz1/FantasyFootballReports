@@ -40,3 +40,9 @@ Upload Data Steps:
   - post_rb_autoload
 
   
+----------------
+
+Debug:
+
+
+"'NoneType' object has no attribute 'text'",)
